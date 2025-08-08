@@ -12,11 +12,11 @@ from typing import Dict, Any
 
 # Reuse config constants without importing heavy frameworks
 try:
-    from config import model_args, model_path
+    from config import model_args, model_path, name_path, data_file_name
 except Exception:
     # Fallback if import path differs
     sys.path.append(os.path.dirname(os.path.abspath(__file__)))
-    from config import model_args, model_path
+    from config import model_args, model_path, name_path, data_file_name
 
 
 def absolute(path: str) -> str:
@@ -28,6 +28,11 @@ def file_exists(path: str) -> bool:
 
 
 def ensure_data_for_dlt(project_root: str) -> None:
+    # If local CSV exists, skip fetching
+    local_csv = os.path.join(project_root, name_path["dlt"]["path"], data_file_name)
+    if os.path.exists(local_csv):
+        print(f"检测到本地数据文件：{local_csv}，跳过抓取。")
+        return
     script = absolute(os.path.join(project_root, "get_data.py"))
     cmd = f"{shlex.quote(sys.executable)} {shlex.quote(script)} --name dlt"
     subprocess.run(cmd, shell=True, check=True, cwd=project_root)
