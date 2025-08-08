@@ -10,6 +10,7 @@ import numpy as np
 import tensorflow as tf
 from config import *
 from get_data import get_current_number, spider
+import pandas as pd
 from loguru import logger
 
 parser = argparse.ArgumentParser()
@@ -22,58 +23,42 @@ tf.compat.v1.disable_eager_execution()
 
 def load_model(name):
     """ 加载模型 """
-    if name == "ssq":
-        red_graph = tf.compat.v1.Graph()
-        with red_graph.as_default():
-            red_saver = tf.compat.v1.train.import_meta_graph(
-                "{}red_ball_model.ckpt.meta".format(model_args[args.name]["path"]["red"])
-            )
-        red_sess = tf.compat.v1.Session(graph=red_graph)
-        red_saver.restore(red_sess, "{}red_ball_model.ckpt".format(model_args[args.name]["path"]["red"]))
-        logger.info("已加载红球模型！")
+    def _load_current_number():
+        try:
+            return get_current_number(args.name)
+        except Exception:
+            path = "{}{}".format(name_path[name]["path"], data_file_name)
+            if os.path.exists(path):
+                df = pd.read_csv(path)
+                if "期数" in df.columns and len(df) > 0:
+                    return str(int(df.iloc[-1]["期数"]))
+            raise
 
-        blue_graph = tf.compat.v1.Graph()
-        with blue_graph.as_default():
-            blue_saver = tf.compat.v1.train.import_meta_graph(
-                "{}blue_ball_model.ckpt.meta".format(model_args[args.name]["path"]["blue"])
-            )
-        blue_sess = tf.compat.v1.Session(graph=blue_graph)
-        blue_saver.restore(blue_sess, "{}blue_ball_model.ckpt".format(model_args[args.name]["path"]["blue"]))
-        logger.info("已加载蓝球模型！")
+    red_graph = tf.compat.v1.Graph()
+    with red_graph.as_default():
+        red_saver = tf.compat.v1.train.import_meta_graph(
+            "{}red_ball_model.ckpt.meta".format(model_args[args.name]["path"]["red"])
+        )
+    red_sess = tf.compat.v1.Session(graph=red_graph)
+    red_saver.restore(red_sess, "{}red_ball_model.ckpt".format(model_args[args.name]["path"]["red"]))
+    logger.info("已加载红球模型！")
 
-        # 加载关键节点名
-        with open("{}/{}/{}".format(model_path, args.name, pred_key_name)) as f:
-            pred_key_d = json.load(f)
+    blue_graph = tf.compat.v1.Graph()
+    with blue_graph.as_default():
+        blue_saver = tf.compat.v1.train.import_meta_graph(
+            "{}blue_ball_model.ckpt.meta".format(model_args[args.name]["path"]["blue"])
+        )
+    blue_sess = tf.compat.v1.Session(graph=blue_graph)
+    blue_saver.restore(blue_sess, "{}blue_ball_model.ckpt".format(model_args[args.name]["path"]["blue"]))
+    logger.info("已加载蓝球模型！")
 
-        current_number = get_current_number(args.name)
-        logger.info("【{}】最近一期:{}".format(name_path[args.name]["name"], current_number))
-        return red_graph, red_sess, blue_graph, blue_sess, pred_key_d, current_number
-    else:
-        red_graph = tf.compat.v1.Graph()
-        with red_graph.as_default():
-            red_saver = tf.compat.v1.train.import_meta_graph(
-                "{}red_ball_model.ckpt.meta".format(model_args[args.name]["path"]["red"])
-            )
-        red_sess = tf.compat.v1.Session(graph=red_graph)
-        red_saver.restore(red_sess, "{}red_ball_model.ckpt".format(model_args[args.name]["path"]["red"]))
-        logger.info("已加载红球模型！")
+    # 加载关键节点名
+    with open("{}/{}/{}".format(model_path, args.name, pred_key_name)) as f:
+        pred_key_d = json.load(f)
 
-        blue_graph = tf.compat.v1.Graph()
-        with blue_graph.as_default():
-            blue_saver = tf.compat.v1.train.import_meta_graph(
-                "{}blue_ball_model.ckpt.meta".format(model_args[args.name]["path"]["blue"])
-            )
-        blue_sess = tf.compat.v1.Session(graph=blue_graph)
-        blue_saver.restore(blue_sess, "{}blue_ball_model.ckpt".format(model_args[args.name]["path"]["blue"]))
-        logger.info("已加载蓝球模型！")
-
-        # 加载关键节点名
-        with open("{}/{}/{}".format(model_path,args.name , pred_key_name)) as f:
-            pred_key_d = json.load(f)
-
-        current_number = get_current_number(args.name)
-        logger.info("【{}】最近一期:{}".format(name_path[args.name]["name"], current_number))
-        return red_graph, red_sess, blue_graph, blue_sess, pred_key_d, current_number
+    current_number = _load_current_number()
+    logger.info("【{}】最近一期:{}".format(name_path[args.name]["name"], current_number))
+    return red_graph, red_sess, blue_graph, blue_sess, pred_key_d, current_number
 
 
 def get_year():
@@ -178,7 +163,13 @@ def run(name):
     try:
         red_graph, red_sess, blue_graph, blue_sess, pred_key_d, current_number = load_model(name)
         windows_size = model_args[name]["model_args"]["windows_size"]
-        data = spider(name, 1, current_number, "predict")
+        try:
+            data = spider(name, 1, current_number, "predict")
+        except Exception:
+            # Fallback to local CSV
+            path = "{}{}".format(name_path[name]["path"], data_file_name)
+            logger.warning("网络抓取失败，使用本地数据：{}".format(path))
+            data = pd.read_csv(path)
         logger.info("【{}】预测期号：{}".format(name_path[name]["name"], int(current_number) + 1))
         predict_features_ = try_error(1, name, data.iloc[:windows_size], windows_size)
         logger.info("预测结果：{}".format(get_final_result(

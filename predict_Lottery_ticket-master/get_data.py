@@ -29,11 +29,23 @@ def get_current_number(name):
     :return: int
     """
     url, _ = get_url(name)
-    r = requests.get("{}{}".format(url, "history.shtml"), verify=False)
-    r.encoding = "gb2312"
-    soup = BeautifulSoup(r.text, "lxml")
-    current_num = soup.find("div", class_="wrap_datachart").find("input", id="end")["value"]
-    return current_num
+    try:
+        r = requests.get("{}{}".format(url, "history.shtml"), verify=False, timeout=10)
+        r.encoding = "gb2312"
+        soup = BeautifulSoup(r.text, "lxml")
+        current_num = soup.find("div", class_="wrap_datachart").find("input", id="end")["value"]
+        return current_num
+    except Exception:
+        # Fallback: read last issue number from local CSV if available
+        local_csv = os.path.join(os.getcwd(), name_path[name]["path"], data_file_name)
+        if os.path.exists(local_csv):
+            try:
+                df = pd.read_csv(local_csv)
+                if "期数" in df.columns and len(df) > 0:
+                    return str(int(df.iloc[-1]["期数"]))
+            except Exception:
+                pass
+        raise
 
 
 def spider(name, start, end, mode):
@@ -45,36 +57,48 @@ def spider(name, start, end, mode):
     :return:
     """
     url, path = get_url(name)
-    url = "{}{}{}".format(url, path.format(start), end)
-    r = requests.get(url=url, verify=False)
-    r.encoding = "gb2312"
-    soup = BeautifulSoup(r.text, "lxml")
-    trs = soup.find("tbody", attrs={"id": "tdata"}).find_all("tr")
-    data = []
-    for tr in trs:
-        item = dict()
-        if name == "ssq":
-            item[u"期数"] = tr.find_all("td")[0].get_text().strip()
-            for i in range(6):
-                item[u"红球_{}".format(i+1)] = tr.find_all("td")[i+1].get_text().strip()
-            item[u"蓝球"] = tr.find_all("td")[7].get_text().strip()
-            data.append(item)
-        elif name == "dlt":
-            item[u"期数"] = tr.find_all("td")[0].get_text().strip()
-            for i in range(5):
-                item[u"红球_{}".format(i+1)] = tr.find_all("td")[i+1].get_text().strip()
-            for j in range(2):
-                item[u"蓝球_{}".format(j+1)] = tr.find_all("td")[6+j].get_text().strip()
-            data.append(item)
+    try:
+        url = "{}{}{}".format(url, path.format(start), end)
+        r = requests.get(url=url, verify=False, timeout=10)
+        r.encoding = "gb2312"
+        soup = BeautifulSoup(r.text, "lxml")
+        trs = soup.find("tbody", attrs={"id": "tdata"}).find_all("tr")
+        data = []
+        for tr in trs:
+            item = dict()
+            if name == "ssq":
+                item[u"期数"] = tr.find_all("td")[0].get_text().strip()
+                for i in range(6):
+                    item[u"红球_{}".format(i+1)] = tr.find_all("td")[i+1].get_text().strip()
+                item[u"蓝球"] = tr.find_all("td")[7].get_text().strip()
+                data.append(item)
+            elif name == "dlt":
+                item[u"期数"] = tr.find_all("td")[0].get_text().strip()
+                for i in range(5):
+                    item[u"红球_{}".format(i+1)] = tr.find_all("td")[i+1].get_text().strip()
+                for j in range(2):
+                    item[u"蓝球_{}".format(j+1)] = tr.find_all("td")[6+j].get_text().strip()
+                data.append(item)
+            else:
+                logger.warning("抱歉，没有找到数据源！")
+        df = pd.DataFrame(data)
+    except Exception:
+        # Fallback: use local CSV if available
+        local_csv = os.path.join(os.getcwd(), name_path[name]["path"], data_file_name)
+        if os.path.exists(local_csv):
+            logger.warning("网络抓取失败，回退使用本地数据：{}".format(local_csv))
+            df = pd.read_csv(local_csv)
         else:
-            logger.warning("抱歉，没有找到数据源！")
+            raise
 
     if mode == "train":
-        df = pd.DataFrame(data)
-        df.to_csv("{}{}".format(name_path[name]["path"], data_file_name), encoding="utf-8")
-        return pd.DataFrame(data)
+        # 保存最新的抓取或本地数据
+        if not os.path.exists(name_path[name]["path"]):
+            os.makedirs(name_path[name]["path"])
+        df.to_csv("{}{}".format(name_path[name]["path"], data_file_name), index=False, encoding="utf-8")
+        return df
     elif mode == "predict":
-        return pd.DataFrame(data)
+        return df
 
 
 def run(name):
