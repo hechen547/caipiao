@@ -91,7 +91,7 @@ class SignalLstmModel(object):
         final_lstm = tf.keras.layers.LSTM(hidden_size, recurrent_dropout=0.2)(lstm)
         self._outputs = tf.keras.layers.Dense(outputs_size, activation="softmax")(final_lstm)
         # 构建损失函数
-        self._loss = - tf.reduce_sum(self._tag_indices * tf.math.log(self._outputs))
+        self._loss = - tf.reduce_sum(self._tag_indices * tf.math.log(self._outputs + 1e-8))
         # 预测结果
         self._pred_label = tf.argmax(self.outputs, axis=1)
 

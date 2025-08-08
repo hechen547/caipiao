@@ -27,7 +27,7 @@ def create_data(data, name, windows):
     :return:
     """
     if not len(data):
-        raise logger.error(" 请执行 get_data.py 进行数据下载！")
+        raise Exception("请执行 get_data.py 进行数据下载！")
     else:
         # 创建模型文件夹
         if not os.path.exists(model_path):
@@ -56,7 +56,7 @@ def create_data(data, name, windows):
 def create_train_test_data(name, windows, train_test_split):
     """ 划分数据集 """
     if train_test_split < 0.5:
-        raise "训练集采样比例小于50%,训练终止,请求重新采样（train_test_split>0.5）!"
+        raise Exception("训练集采样比例小于50%,训练终止,请重新采样（train_test_split>0.5）!")
     path = "{}{}".format(name_path[name]["path"], data_file_name)
     data = pd.read_csv(path)
     logger.info("read data from path: {}".format(path))

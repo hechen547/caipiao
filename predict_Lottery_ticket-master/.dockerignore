@@ -1,0 +1,14 @@
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.swp
+.git/
+.gitignore
+.idea/
+.vscode/
+__pycache__/
+*.ckpt*
+model/
+data/
+img/
