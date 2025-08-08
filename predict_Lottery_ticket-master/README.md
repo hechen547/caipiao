@@ -36,6 +36,34 @@ python run_predict.py  --name ssq # 执行双色球模型预测
 ```
 预测结果会打印在控制台
 
+## 一键运行：大乐透预测 CLI
+
+新增脚本 `dlt_predict_app.py`，可一键完成「抓取数据 →（可选）训练 → 预测」：
+
+- 只预测（要求已训练模型）：
+```bash
+python dlt_predict_app.py --predict-only
+```
+
+- 首次运行（无模型时会自动抓取数据并训练，然后预测）：
+```bash
+python dlt_predict_app.py
+```
+
+- 强制重新训练：
+```bash
+python dlt_predict_app.py --force-train --refresh-data --train-test-split 0.8
+```
+
+运行成功后，将在控制台输出类似：
+```
+===== 大乐透预测结果 =====
+红球(5): 01 07 15 22 33
+蓝球(2): 03 10
+```
+
+> 说明：脚本内部会调用本仓库已有的 `get_data.py`、`run_train_model.py` 和 `run_predict.py`，仅针对大乐透（`--name dlt`）。
+
 ## Update
 
 * 新增模型预测评估，可以自行调整训练集和测试集比例，建议训练集采样比例高于0.5
@@ -52,3 +80,29 @@ python run_predict.py  --name ssq # 执行双色球模型预测
 * 之前有issue反应，因为不同红球模型预测会有重复号码出现，所以将红球序列整体作为一个序列模型看待，推翻之前红球之间相互独立设定，
 因为序列模型预测要引入crf层，相关API必须在 tf.compat.v1.disable_eager_execution()下，故整个模型采用 1.x 构建和训练模式，
 在 2.x 的tensorflow中 tf.compat.v1.XXX 保留了 1.x 的接口方式。
+
+## 使用 Docker 打包运行（推荐）
+
+无需本地安装深度学习环境，使用 Docker 一键运行（支持持久化 `data/` 与 `model/`）
+
+- 构建镜像：
+```bash
+bash run_docker.sh --help   # 首次运行会自动构建镜像
+```
+
+- 首次运行（自动抓取数据→训练→预测）：
+```bash
+bash run_docker.sh
+```
+
+- 只预测（要求已有模型）：
+```bash
+bash run_docker.sh --predict-only
+```
+
+- 强制重新训练并刷新数据：
+```bash
+bash run_docker.sh --force-train --refresh-data --train-test-split 0.8
+```
+
+镜像默认入口即 `dlt_predict_app.py`，运行日志及模型持久化在宿主机的 `data/`、`model/` 目录。
