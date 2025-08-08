@@ -45,17 +45,30 @@ def models_present_for_dlt(project_root: str) -> bool:
 
 
 def train_models_for_dlt(project_root: str, train_test_split: float) -> None:
-    script = absolute(os.path.join(project_root, "run_train_model.py"))
-    cmd = (
-        f"{shlex.quote(sys.executable)} {shlex.quote(script)} --name dlt "
-        f"--train_test_split {train_test_split}"
-    )
-    subprocess.run(cmd, shell=True, check=True, cwd=project_root)
+    try:
+        # Try full model training
+        script = absolute(os.path.join(project_root, "run_train_model.py"))
+        cmd = (
+            f"{shlex.quote(sys.executable)} {shlex.quote(script)} --name dlt "
+            f"--train_test_split {train_test_split}"
+        )
+        subprocess.run(cmd, shell=True, check=True, cwd=project_root)
+    except Exception:
+        # Fallback to lite trainer
+        script = absolute(os.path.join(project_root, "dlt_predict_lite.py"))
+        cmd = f"{shlex.quote(sys.executable)} {shlex.quote(script)} --mode train"
+        subprocess.run(cmd, shell=True, check=True, cwd=project_root)
 
 
 def run_prediction_for_dlt(project_root: str) -> str:
-    script = absolute(os.path.join(project_root, "run_predict.py"))
-    cmd = f"{shlex.quote(sys.executable)} {shlex.quote(script)} --name dlt"
+    # Prefer full model; if its checkpoints are missing, use lite predictor
+    has_full_model = models_present_for_dlt(project_root)
+    if not has_full_model:
+        script = absolute(os.path.join(project_root, "dlt_predict_lite.py"))
+        cmd = f"{shlex.quote(sys.executable)} {shlex.quote(script)} --mode predict"
+    else:
+        script = absolute(os.path.join(project_root, "run_predict.py"))
+        cmd = f"{shlex.quote(sys.executable)} {shlex.quote(script)} --name dlt"
     proc = subprocess.run(cmd, shell=True, check=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, cwd=project_root)
     return proc.stdout.decode("utf-8", errors="ignore")
 
