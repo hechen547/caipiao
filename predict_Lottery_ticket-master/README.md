@@ -106,3 +106,24 @@ bash run_docker.sh --force-train --refresh-data --train-test-split 0.8
 ```
 
 镜像默认入口即 `dlt_predict_app.py`，运行日志及模型持久化在宿主机的 `data/`、`model/` 目录。
+
+## 桌面 GUI（Tkinter）
+
+新增 `dlt_gui.py`，提供图形界面：抓取数据 / 训练 / 预测 / 一键运行。
+
+- 启动 GUI：
+```bash
+python dlt_gui.py
+```
+
+- 打包为单文件可执行程序（示例：Windows/macOS/Linux 通用命令）：
+```bash
+pip install pyinstaller
+pyinstaller -F -w dlt_gui.py 
+# 生成的可执行文件在 dist/ 目录下
+```
+
+说明：
+- `-F` 打包为单文件，`-w` 无控制台窗口（Windows/macOS）。
+- 首次运行可能需要联网以抓取历史数据与安装依赖。
+- 若打包体积过大，可在 `requirements.txt` 中切换为 `tensorflow-cpu` 以减小体积，或考虑 Docker 分发。
